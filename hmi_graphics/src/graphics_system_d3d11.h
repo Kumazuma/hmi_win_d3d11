@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <tuple>
+#include <dxgi1_5.h>
 #include "comptr.h"
 #include "graphics_system.h"
 
@@ -34,9 +35,8 @@ namespace hmi_graphics
         std::vector<std::tuple<GraphicsElement*, ComPtr<ID3D11Texture2D>, ComPtr<ID2D1Bitmap1>>> m_elements;
         ComPtr<ID3D11Device> d3dDevice_;
         ComPtr<ID3D11DeviceContext> d3dContext_;
-        ComPtr<IDXGISwapChain> swapChain_;
-        ComPtr<ID3D11RenderTargetView> renderTargetView_;
-        ComPtr<ID3D11Texture2D> swapChainTexture_;
+        ComPtr<IDXGISwapChain1> swapChain_;
+        ComPtr<IDXGIFactory2> factory_;
         ComPtr<ID2D1Bitmap1> swapChainBitmap_;
         ComPtr<ID2D1Device> d2dDevice_;
         ComPtr<ID2D1Factory> d2dFactory_;
