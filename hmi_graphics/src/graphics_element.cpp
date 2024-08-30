@@ -8,7 +8,7 @@ namespace hmi_graphics
     {
     }
 
-    bool GraphicsElement::Initialize(Pimpl* pimpl)
+    bool GraphicsElement::Initialize(Pimpl* pimpl, System* parent)
     {
         if (pimpl == nullptr)
         {
@@ -33,5 +33,10 @@ namespace hmi_graphics
         }
 
         return pimpl_->GetTarget(target);
+    }
+
+    ID2D1Bitmap1* GraphicsElement::GetTarget() const
+    {
+        return pimpl_->GetTarget();
     }
 }

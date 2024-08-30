@@ -3,11 +3,16 @@
 #include <string>
 #include <Windows.h>
 #include <graphics/graphics_system.h>
+#include <graphics/graphics_element.h>
+#include <wrl/client.h>
 
+class RedButton;
 class HmiSystemWindow
 {
 public:
     HmiSystemWindow(const std::wstring &title, int width, int height);
+
+    ~HmiSystemWindow();
 
     void SpinOnce();
 
@@ -15,7 +20,37 @@ private:
     static LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
     HWND m_hWnd;
     hmi_graphics::System* m_graphics;
+    RedButton* m_button;
 };
+
+class RedButton: public hmi_graphics::GraphicsElement
+{
+public:
+    RedButton() = default;
+
+    bool Initialize(Pimpl* pimpl, hmi_graphics::System* parent) override;
+
+    void Render(hmi_graphics::System* parent) override;
+private:
+    Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> m_brush;
+};
+
+bool RedButton::Initialize(Pimpl* pimpl, hmi_graphics::System* parent)
+{
+    GraphicsElement::Initialize(pimpl, parent);
+    parent->GetCachedColorBrush(D2D1::ColorF(D2D1::ColorF::Red), &m_brush);
+    return true;
+}
+
+void RedButton::Render(hmi_graphics::System* parent)
+{
+    Microsoft::WRL::ComPtr<ID2D1DeviceContext> context;
+    parent->GetDirect2dDeviceContext(&context);
+    context->SetTarget(GetTarget());
+    context->BeginDraw();
+    context->Clear(D2D1::ColorF(D2D1::ColorF::Red));
+    context->EndDraw();
+}
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
@@ -72,6 +107,12 @@ HmiSystemWindow::HmiSystemWindow(const std::wstring& title, int width, int heigh
     ShowWindow(m_hWnd, SW_SHOW);
 }
 
+HmiSystemWindow::~HmiSystemWindow()
+{
+    delete m_button;
+    delete m_graphics;
+}
+
 void HmiSystemWindow::SpinOnce()
 {
     m_graphics->Render();
@@ -100,6 +141,7 @@ LRESULT HmiSystemWindow::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
         auto instance = (HmiSystemWindow*)s->lpCreateParams;
         SetWindowLongPtrW(hWnd, GWLP_USERDATA, (LONG_PTR)instance);
         instance->m_graphics = graphics;
+        instance->m_button = graphics->AddElement<RedButton>(100, 100);
         return 0;
     }
 

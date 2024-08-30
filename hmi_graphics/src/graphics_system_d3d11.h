@@ -42,6 +42,7 @@ namespace hmi_graphics
         ComPtr<ID2D1Factory> d2dFactory_;
         ComPtr<ID2D1DeviceContext> d2dContextForElements_;
         ComPtr<ID2D1DeviceContext> d2dContextForRendering_;
+        std::vector<std::tuple<D2D1::ColorF, ComPtr<ID2D1SolidColorBrush>>> d2dColorBrushes_;
     };
 }
 

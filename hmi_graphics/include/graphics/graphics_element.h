@@ -25,7 +25,7 @@ namespace hmi_graphics
 
         GraphicsElement(const GraphicsElement&) = delete;
 
-        virtual bool Initialize(Pimpl* pimpl);
+        virtual bool Initialize(Pimpl* pimpl, System* parent);
 
         virtual ~GraphicsElement();
 
@@ -44,6 +44,10 @@ namespace hmi_graphics
         bool GetTarget(ID2D1Bitmap1** target);
 
         virtual void Render(System* parent) = 0;
+
+    protected:
+        ID2D1Bitmap1* GetTarget() const;
+
     private:
         Pimpl *pimpl_;
     };

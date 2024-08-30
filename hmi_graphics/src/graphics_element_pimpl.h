@@ -8,7 +8,7 @@
 #include <d3d11.h>
 #include <d2d1_2.h>
 #include <wrl.h>
-
+#include <cassert>
 
 class hmi_graphics::GraphicsElement::Pimpl
 {
@@ -18,7 +18,10 @@ public:
 
     bool GetTarget(ID2D1Bitmap1** target);
 
+    ID2D1Bitmap1* GetTarget();
+
 private:
+    System* system_;
     ComPtr<ID2D1Bitmap1> target_;
     ComPtr<ID3D11Texture2D> targetTexture_;
     ComPtr<ID2D1DeviceContext> context_;
@@ -26,12 +29,16 @@ private:
 
 inline hmi_graphics::GraphicsElement::Pimpl::Pimpl(System* system, int16_t width, int16_t height, ID3D11Texture2D* texture)
 {
-    auto d3d11System = static_cast<SystemD3D11*>(system);
-
-
+    HRESULT hr{};
+    system_ = static_cast<SystemD3D11*>(system);
     ComPtr<IDXGISurface> surface;
+    ComPtr<ID2D1DeviceContext> context;
+    system_->GetDirect2dDeviceContext(&context);
+    targetTexture_ = texture;
     targetTexture_->QueryInterface(IID_PPV_ARGS(&surface));
-
+    auto destProp = D2D1::BitmapProperties1(D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW, D2D1::PixelFormat(DXGI_FORMAT_R8G8B8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED));
+    hr = context->CreateBitmapFromDxgiSurface(surface.Get(), destProp, &target_);
+    assert(SUCCEEDED(hr));
 }
 
 inline bool hmi_graphics::GraphicsElement::Pimpl::GetTarget(ID2D1Bitmap1** target)
@@ -44,6 +51,11 @@ inline bool hmi_graphics::GraphicsElement::Pimpl::GetTarget(ID2D1Bitmap1** targe
     }
 
     return false;
+}
+
+inline ID2D1Bitmap1* hmi_graphics::GraphicsElement::Pimpl::GetTarget()
+{
+    return target_.Get();
 }
 
 #endif //GRAPHICS_ELEMENT_PIMPL_H

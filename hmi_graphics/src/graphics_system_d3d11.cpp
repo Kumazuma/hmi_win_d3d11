@@ -40,7 +40,7 @@ namespace hmi_graphics
 
         ComPtr<IDXGIDevice> dxgiDevice;
         d3dDevice_.As(&dxgiDevice);
-        D2D1CreateDevice(dxgiDevice.Get(), D2D1::CreationProperties(D2D1_THREADING_MODE_SINGLE_THREADED, D2D1_DEBUG_LEVEL_NONE, D2D1_DEVICE_CONTEXT_OPTIONS_NONE), &d2dDevice_);
+        D2D1CreateDevice(dxgiDevice.Get(), D2D1::CreationProperties(D2D1_THREADING_MODE_SINGLE_THREADED, D2D1_DEBUG_LEVEL_WARNING, D2D1_DEVICE_CONTEXT_OPTIONS_NONE), &d2dDevice_);
         d2dDevice_->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &d2dContextForElements_);
         d2dDevice_->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &d2dContextForRendering_);
 
@@ -74,19 +74,53 @@ namespace hmi_graphics
 
     bool SystemD3D11::GetDirect2dDeviceContext(ID2D1DeviceContext** deviceContext)
     {
-        return false;
+        if(deviceContext == nullptr)
+        {
+            return false;
+        }
+
+        *deviceContext = d2dContextForElements_.Get();
+        d2dContextForElements_->AddRef();
+        return true;
     }
 
     bool SystemD3D11::GetCachedColorBrush(const D2D1_COLOR_F& rgba, ID2D1SolidColorBrush** colorBrush)
     {
-        return false;
+        for(auto& tuple : d2dColorBrushes_)
+        {
+            auto& color = std::get<0>(tuple);
+            if(color.a == rgba.a && color.b == rgba.b && color.g == rgba.g && color.r == rgba.r)
+            {
+                auto& brush = std::get<1>(tuple);
+                *colorBrush = brush.Get();
+                brush->AddRef();
+                return true;
+            }
+        }
+
+        ComPtr<ID2D1SolidColorBrush> brush;
+        d2dContextForElements_->CreateSolidColorBrush(rgba, &brush);
+        *colorBrush = brush.Get();
+        brush->AddRef();
+        return true;
     }
 
     void SystemD3D11::Render()
     {
+        for(auto& tuple: m_elements)
+        {
+            auto* element = std::get<0>(tuple);
+            element->Render(this);
+        }
+
         d2dContextForRendering_->SetTarget(swapChainBitmap_.Get());
         d2dContextForRendering_->BeginDraw();
         d2dContextForRendering_->Clear(D2D1::ColorF(D2D1::ColorF::White));
+        for(auto& tuple: m_elements)
+        {
+            auto& bitmap = std::get<2>(tuple);
+            d2dContextForRendering_->DrawBitmap(bitmap.Get());
+        }
 
         d2dContextForRendering_->EndDraw();
         swapChain_->Present(1, 0);
@@ -114,9 +148,9 @@ namespace hmi_graphics
         desc.SampleDesc.Count = 1;
         desc.SampleDesc.Quality = 0;
         desc.Usage = D3D11_USAGE_DEFAULT;
-        desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+        desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_RENDER_TARGET;
         d3dDevice_->CreateTexture2D(&desc, nullptr, &texture);
-        element->Initialize(new GraphicsElement::Pimpl{this, width, height, texture.Get()});
+        element->Initialize(new GraphicsElement::Pimpl{this, width, height, texture.Get()}, this);
         ComPtr<IDXGISurface> surface;
         ComPtr<ID2D1Bitmap1> bitmapSource;
         texture->QueryInterface(IID_PPV_ARGS(&surface));
