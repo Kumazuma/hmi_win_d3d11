@@ -94,11 +94,15 @@ namespace hmi_graphics
 
     bool SystemD3D11::GetCachedColorBrush(const D2D1_COLOR_F& rgba, ID2D1SolidColorBrush** colorBrush)
     {
-        const uint32_t key = (static_cast<int>(rgba.r * 256) / 256) % 256;
+        uint32_t key = 0;
+        key |= static_cast<int>(rgba.r * 255) % 256 << 24;
+        key |= static_cast<int>(rgba.g * 255) % 256 << 16;
+        key |= static_cast<int>(rgba.b * 255) % 256 << 8;
+        key |= static_cast<int>(rgba.a * 255) % 256 << 0;
         for(auto& tuple : d2dColorBrushes_)
         {
             auto& color = std::get<0>(tuple);
-            if(color.a == rgba.a && color.b == rgba.b && color.g == rgba.g && color.r == rgba.r)
+            if(key == color)
             {
                 auto& brush = std::get<1>(tuple);
                 *colorBrush = brush.Get();
