@@ -6,7 +6,7 @@
 #include <graphics/graphics_element.h>
 #include <wrl/client.h>
 
-class RedButton;
+class ColorButton;
 class HmiSystemWindow
 {
 public:
@@ -20,35 +20,40 @@ private:
     static LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
     HWND m_hWnd;
     hmi_graphics::System* m_graphics;
-    RedButton* m_button;
+    ColorButton* m_redButton;
+    ColorButton* m_greenButton;
 };
 
-class RedButton: public hmi_graphics::GraphicsElement
+class ColorButton: public hmi_graphics::GraphicsElement
 {
 public:
-    RedButton() = default;
+    explicit ColorButton(const D2D1_COLOR_F& color)
+    {
+        m_color = color;
+    }
 
     bool Initialize(Pimpl* pimpl, hmi_graphics::System* parent) override;
 
     void Render(hmi_graphics::System* parent) override;
 private:
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> m_brush;
+    D2D1_COLOR_F m_color;
 };
 
-bool RedButton::Initialize(Pimpl* pimpl, hmi_graphics::System* parent)
+bool ColorButton::Initialize(Pimpl* pimpl, hmi_graphics::System* parent)
 {
     GraphicsElement::Initialize(pimpl, parent);
     parent->GetCachedColorBrush(D2D1::ColorF(D2D1::ColorF::Red), &m_brush);
     return true;
 }
 
-void RedButton::Render(hmi_graphics::System* parent)
+void ColorButton::Render(hmi_graphics::System* parent)
 {
     Microsoft::WRL::ComPtr<ID2D1DeviceContext> context;
     parent->GetDirect2dDeviceContext(&context);
     context->SetTarget(GetTarget());
     context->BeginDraw();
-    context->Clear(D2D1::ColorF(D2D1::ColorF::Red));
+    context->Clear(m_color);
     context->EndDraw();
 }
 
@@ -109,7 +114,8 @@ HmiSystemWindow::HmiSystemWindow(const std::wstring& title, int width, int heigh
 
 HmiSystemWindow::~HmiSystemWindow()
 {
-    delete m_button;
+    delete m_redButton;
+    delete m_greenButton;
     delete m_graphics;
 }
 
@@ -141,7 +147,10 @@ LRESULT HmiSystemWindow::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
         auto instance = (HmiSystemWindow*)s->lpCreateParams;
         SetWindowLongPtrW(hWnd, GWLP_USERDATA, (LONG_PTR)instance);
         instance->m_graphics = graphics;
-        instance->m_button = graphics->AddElement<RedButton>(100, 100);
+        instance->m_redButton = graphics->AddElement<ColorButton>(100, 100, D2D1::ColorF(D2D1::ColorF::Red, 0.5f));
+        instance->m_greenButton = graphics->AddElement<ColorButton>(100, 100, D2D1::ColorF(D2D1::ColorF::Green, 1.f));
+        instance->m_redButton->SetPosition(50, 50);
+        instance->m_redButton->SetZIndex(1);
         return 0;
     }
 

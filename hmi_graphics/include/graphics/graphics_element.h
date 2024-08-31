@@ -43,6 +43,8 @@ namespace hmi_graphics
 
         bool GetTarget(ID2D1Bitmap1** target);
 
+        System* GetParent() const;
+
         virtual void Render(System* parent) = 0;
 
     protected:

@@ -24,15 +24,17 @@ namespace hmi_graphics
 
         void Render() override;
 
-        void GetDirect3dDevice(ID3D11Device** device);
+        void GetDirect3dDevice(ID3D11Device** device) override;
 
-        void GetDirect3dDeviceContext(ID3D11DeviceContext** deviceContext);
+        void GetDirect3dContext(ID3D11DeviceContext** deviceContext) override;
+
+        void ElementZIndexUpdated();
 
     protected:
         void AddElement(GraphicsElement* element, int16_t width, int16_t height) override;
 
     private:
-        std::vector<std::tuple<GraphicsElement*, ComPtr<ID3D11Texture2D>, ComPtr<ID2D1Bitmap1>>> m_elements;
+        std::vector<std::tuple<GraphicsElement*, ComPtr<ID3D11Texture2D>, ComPtr<ID2D1Bitmap1>>> elements_;
         ComPtr<ID3D11Device> d3dDevice_;
         ComPtr<ID3D11DeviceContext> d3dContext_;
         ComPtr<IDXGISwapChain1> swapChain_;
@@ -43,6 +45,8 @@ namespace hmi_graphics
         ComPtr<ID2D1DeviceContext> d2dContextForElements_;
         ComPtr<ID2D1DeviceContext> d2dContextForRendering_;
         std::vector<std::tuple<D2D1::ColorF, ComPtr<ID2D1SolidColorBrush>>> d2dColorBrushes_;
+        size_t latestZIndexUpdated_;
+        size_t currentZIndexUpdated_;
     };
 }
 

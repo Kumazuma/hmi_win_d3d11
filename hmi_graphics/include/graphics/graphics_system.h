@@ -36,6 +36,10 @@ namespace hmi_graphics
 
         virtual void Render() = 0;
 
+        virtual void GetDirect3dDevice(ID3D11Device** device) = 0;
+
+        virtual void GetDirect3dContext(ID3D11DeviceContext** context) = 0;
+
     protected:
         virtual void AddElement(GraphicsElement* element, int16_t width, int16_t height) = 0;
 

@@ -25,6 +25,43 @@ namespace hmi_graphics
         pimpl_ = nullptr;
     }
 
+    int16_t GraphicsElement::GetZIndex() const
+    {
+        return pimpl_->zIndex_;
+    }
+
+    void GraphicsElement::SetZIndex(int16_t zIndex)
+    {
+        int16_t oldZIndex = pimpl_->zIndex_;
+        pimpl_->zIndex_ = zIndex;
+        if(oldZIndex != zIndex)
+        {
+            pimpl_->system_->ElementZIndexUpdated();
+        }
+    }
+
+    void GraphicsElement::SetSize(int16_t width, int16_t height)
+    {
+        pimpl_->width_ = width;
+        pimpl_->height_ = height;
+    }
+
+    std::tuple<int16_t, int16_t> GraphicsElement::GetSize() const
+    {
+        return {pimpl_->width_, pimpl_->height_};
+    }
+
+    void GraphicsElement::SetPosition(int16_t x, int16_t y)
+    {
+        pimpl_->x_ = x;
+        pimpl_->y_ = y;
+    }
+
+    std::tuple<int16_t, int16_t> GraphicsElement::GetPosition() const
+    {
+        return {pimpl_->x_, pimpl_->y_};
+    }
+
     bool GraphicsElement::GetTarget(ID2D1Bitmap1** target)
     {
         if(target == nullptr)
@@ -33,6 +70,11 @@ namespace hmi_graphics
         }
 
         return pimpl_->GetTarget(target);
+    }
+
+    System* GraphicsElement::GetParent() const
+    {
+        return pimpl_->system_;
     }
 
     ID2D1Bitmap1* GraphicsElement::GetTarget() const
