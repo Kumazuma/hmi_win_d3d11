@@ -53,6 +53,10 @@ namespace hmi_graphics
         hr = d2dContextForRendering_->CreateBitmapFromDxgiSurface(dxgiSurface.Get(), D2D1::BitmapProperties1(D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW, D2D1::PixelFormat(DXGI_FORMAT_R8G8B8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED)), &swapChainBitmap_);
         if(FAILED(hr))
             throw std::runtime_error(__FILE__ "::" STRINGIZE(__LINE__) " CreateBitmap");
+
+        hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(decltype(dwriteFactory_)::InterfaceType), &dwriteFactory_);
+        if(FAILED(hr))
+            throw std::runtime_error(__FILE__ "::" STRINGIZE(__LINE__) " DWriteCreateFactory");
     }
 
     SystemD3D11::~SystemD3D11()
@@ -90,6 +94,7 @@ namespace hmi_graphics
 
     bool SystemD3D11::GetCachedColorBrush(const D2D1_COLOR_F& rgba, ID2D1SolidColorBrush** colorBrush)
     {
+        const uint32_t key = (static_cast<int>(rgba.r * 256) / 256) % 256;
         for(auto& tuple : d2dColorBrushes_)
         {
             auto& color = std::get<0>(tuple);
@@ -114,6 +119,9 @@ namespace hmi_graphics
         for(auto& tuple: elements_)
         {
             auto* element = std::get<0>(tuple);
+            if(!element->ResetUpdatedFlag())
+                continue;
+
             element->Render(this);
         }
 
@@ -158,6 +166,12 @@ namespace hmi_graphics
     {
         *deviceContext = d3dContext_.Get();
         d3dContext_->AddRef();
+    }
+
+    void SystemD3D11::GetDirectWriteFactory(IDWriteFactory** factory)
+    {
+        *factory = dwriteFactory_.Get();
+        dwriteFactory_->AddRef();
     }
 
     void SystemD3D11::ElementZIndexUpdated()

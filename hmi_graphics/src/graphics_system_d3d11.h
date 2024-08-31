@@ -28,6 +28,8 @@ namespace hmi_graphics
 
         void GetDirect3dContext(ID3D11DeviceContext** deviceContext) override;
 
+        void GetDirectWriteFactory(IDWriteFactory** factory) override;
+
         void ElementZIndexUpdated();
 
     protected:
@@ -44,7 +46,8 @@ namespace hmi_graphics
         ComPtr<ID2D1Factory> d2dFactory_;
         ComPtr<ID2D1DeviceContext> d2dContextForElements_;
         ComPtr<ID2D1DeviceContext> d2dContextForRendering_;
-        std::vector<std::tuple<D2D1::ColorF, ComPtr<ID2D1SolidColorBrush>>> d2dColorBrushes_;
+        ComPtr<IDWriteFactory> dwriteFactory_;
+        std::vector<std::tuple<uint32_t, ComPtr<ID2D1SolidColorBrush>>> d2dColorBrushes_;
         size_t latestZIndexUpdated_;
         size_t currentZIndexUpdated_;
     };

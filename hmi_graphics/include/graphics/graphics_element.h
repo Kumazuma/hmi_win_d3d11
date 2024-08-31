@@ -45,6 +45,10 @@ namespace hmi_graphics
 
         System* GetParent() const;
 
+        void NotifyUpdated();
+
+        bool ResetUpdatedFlag();
+
         virtual void Render(System* parent) = 0;
 
     protected:

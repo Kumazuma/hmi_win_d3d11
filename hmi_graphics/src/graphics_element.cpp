@@ -77,6 +77,18 @@ namespace hmi_graphics
         return pimpl_->system_;
     }
 
+    void GraphicsElement::NotifyUpdated()
+    {
+        pimpl_->updated_ = true;
+    }
+
+    bool GraphicsElement::ResetUpdatedFlag()
+    {
+        bool updated = pimpl_->updated_;
+        pimpl_->updated_ = false;
+        return updated;
+    }
+
     ID2D1Bitmap1* GraphicsElement::GetTarget() const
     {
         return pimpl_->GetTarget();

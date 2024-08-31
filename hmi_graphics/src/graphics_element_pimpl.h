@@ -21,6 +21,7 @@ public:
     ID2D1Bitmap1* GetTarget();
 
 private:
+    bool updated_;
     int16_t x_;
     int16_t y_;
     int16_t width_;
@@ -33,6 +34,12 @@ private:
 };
 
 inline hmi_graphics::GraphicsElement::Pimpl::Pimpl(System* system, int16_t width, int16_t height, ID3D11Texture2D* texture)
+    : updated_{true}
+    , x_{0}
+    , y_{0}
+    , width_{width}
+    , height_{height}
+    , zIndex_{0}
 {
     HRESULT hr{};
     system_ = static_cast<SystemD3D11*>(system);
@@ -40,10 +47,6 @@ inline hmi_graphics::GraphicsElement::Pimpl::Pimpl(System* system, int16_t width
     ComPtr<ID2D1DeviceContext> context;
     system_->GetDirect2dDeviceContext(&context);
     targetTexture_ = texture;
-    width_ = width;
-    height_ = height;
-    x_ = 0;
-    y_ = 0;
     targetTexture_->QueryInterface(IID_PPV_ARGS(&surface));
     auto destProp = D2D1::BitmapProperties1(D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW, D2D1::PixelFormat(DXGI_FORMAT_R8G8B8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED));
     hr = context->CreateBitmapFromDxgiSurface(surface.Get(), destProp, &target_);

@@ -6,6 +6,7 @@
 #include <Windows.h>
 #include <d2d1_2.h>
 #include <d3d11.h>
+#include <dwrite.h>
 
 #if defined(_WIN32) && defined(HMI_GRAPHICS_DLL)
 #if !defined(HMI_GRAPHICS_EXPORT)
@@ -40,13 +41,15 @@ namespace hmi_graphics
 
         virtual void GetDirect3dContext(ID3D11DeviceContext** context) = 0;
 
+        virtual void GetDirectWriteFactory(IDWriteFactory** factory) = 0;
+
     protected:
         virtual void AddElement(GraphicsElement* element, int16_t width, int16_t height) = 0;
 
     };
 
     template <typename T, typename... Args>
-    T* System::AddElement(int16_t width, int16_t height, Args&&... args)
+    inline T* System::AddElement(int16_t width, int16_t height, Args&&... args)
     {
         auto element = new T{ std::forward<Args>(args)... };
         AddElement(element, width, height);
