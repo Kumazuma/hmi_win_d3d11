@@ -27,9 +27,10 @@ private:
 class ColorButton: public hmi_graphics::GraphicsElement
 {
 public:
-    explicit ColorButton(const D2D1_COLOR_F& color)
+    explicit ColorButton(const D2D1_COLOR_F& color, const std::wstring &title)
     {
         m_color = color;
+        m_label = title;
     }
 
     bool Initialize(Pimpl* pimpl, hmi_graphics::System* parent) override;
@@ -37,13 +38,25 @@ public:
     void Render(hmi_graphics::System* parent) override;
 private:
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> m_brush;
+    Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> m_blackBrush;
+    Microsoft::WRL::ComPtr<IDWriteTextFormat> m_textFormat;
+    Microsoft::WRL::ComPtr<IDWriteTextLayout> m_textLayout;
     D2D1_COLOR_F m_color;
+    std::wstring m_label;
 };
 
 bool ColorButton::Initialize(Pimpl* pimpl, hmi_graphics::System* parent)
 {
     GraphicsElement::Initialize(pimpl, parent);
     parent->GetCachedColorBrush(D2D1::ColorF(D2D1::ColorF::Red), &m_brush);
+    parent->GetCachedColorBrush(D2D1::ColorF(D2D1::ColorF::Black), &m_blackBrush);
+    Microsoft::WRL::ComPtr<IDWriteFactory> dwriteFactory;
+    parent->GetDirectWriteFactory(&dwriteFactory);
+    dwriteFactory->CreateTextFormat(L"arial", nullptr, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 11.f, L"", &m_textFormat);
+    m_textFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+    m_textFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+    auto size = GetSize();
+    dwriteFactory->CreateTextLayout(m_label.c_str(), m_label.size(), m_textFormat.Get(), std::get<0>(size), std::get<1>(size), &m_textLayout);
     return true;
 }
 
@@ -54,6 +67,7 @@ void ColorButton::Render(hmi_graphics::System* parent)
     context->SetTarget(GetTarget());
     context->BeginDraw();
     context->Clear(m_color);
+    context->DrawTextLayout(D2D1::Point2(0.f, 0.f), m_textLayout.Get(), m_blackBrush.Get());
     context->EndDraw();
 }
 
@@ -81,6 +95,10 @@ static std::atomic_bool init_flag;
 static std::mutex init_mutex;
 
 HmiSystemWindow::HmiSystemWindow(const std::wstring& title, int width, int height)
+    : m_hWnd(nullptr)
+    , m_graphics()
+    , m_greenButton()
+    ,m_redButton()
 {
     HINSTANCE hInstance = GetModuleHandleW(nullptr);
     if(!init_flag.load())
@@ -130,9 +148,13 @@ LRESULT HmiSystemWindow::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
     {
         switch(uMsg)
         {
-            case WM_CLOSE:
-                PostQuitMessage(0);
-                return 0;
+        case WM_PAINT:
+            ValidateRect(hWnd, nullptr);
+            return 0;
+
+        case WM_CLOSE:
+            PostQuitMessage(0);
+            return 0;
         }
     }
     else
@@ -147,8 +169,8 @@ LRESULT HmiSystemWindow::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
         auto instance = (HmiSystemWindow*)s->lpCreateParams;
         SetWindowLongPtrW(hWnd, GWLP_USERDATA, (LONG_PTR)instance);
         instance->m_graphics = graphics;
-        instance->m_redButton = graphics->AddElement<ColorButton>(100, 100, D2D1::ColorF(D2D1::ColorF::Red, 0.5f));
-        instance->m_greenButton = graphics->AddElement<ColorButton>(100, 100, D2D1::ColorF(D2D1::ColorF::Green, 1.f));
+        instance->m_redButton = graphics->AddElement<ColorButton>(100, 100, D2D1::ColorF(D2D1::ColorF::Red, 0.5f), L"Red Button");
+        instance->m_greenButton = graphics->AddElement<ColorButton>(100, 100, D2D1::ColorF(D2D1::ColorF::Green, 1.f), L"Green Button");
         instance->m_redButton->SetPosition(50, 50);
         instance->m_redButton->SetZIndex(1);
         return 0;
