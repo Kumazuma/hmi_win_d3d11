@@ -43,6 +43,8 @@ namespace hmi_graphics
 
         virtual void GetDirectWriteFactory(IDWriteFactory** factory) = 0;
 
+        virtual GraphicsElement* HitTest(int32_t x, int32_t y, GraphicsElement* hint) = 0;
+
     protected:
         virtual void AddElement(GraphicsElement* element, int16_t width, int16_t height) = 0;
 

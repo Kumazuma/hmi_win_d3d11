@@ -178,6 +178,52 @@ namespace hmi_graphics
         dwriteFactory_->AddRef();
     }
 
+    GraphicsElement* SystemD3D11::HitTest(int32_t x, int32_t y, GraphicsElement* hint)
+    {
+        auto iter = elements_.begin();
+        if(hint != nullptr)
+        {
+            while(iter != elements_.end())
+            {
+                auto& tuple = *iter;
+                auto* element = std::get<0>(tuple);
+                if(element == hint)
+                {
+                    ++iter;
+                    break;
+                }
+
+                ++iter;
+            }
+        }
+
+        GraphicsElement* result = nullptr;
+        for(;iter != elements_.end(); ++iter)
+        {
+
+            auto& tuple = *iter;
+            auto* element = std::get<0>(tuple);
+            int16_t posX;
+            int16_t posY;
+            int16_t width;
+            int16_t height;
+            std::tie(posX, posY) = element->GetPosition();
+            if(posX > x || posY > y)
+                continue;
+
+            std::tie(width, height) = element->GetSize();
+            posX += width;
+            posY += height;
+            if(posX < x || posY < y)
+                continue;
+
+            result = element;
+            break;
+        }
+
+        return result;
+    }
+
     void SystemD3D11::ElementZIndexUpdated()
     {
         currentZIndexUpdated_ += 1;

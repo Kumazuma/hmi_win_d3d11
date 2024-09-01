@@ -30,6 +30,8 @@ namespace hmi_graphics
 
         void GetDirectWriteFactory(IDWriteFactory** factory) override;
 
+        GraphicsElement* HitTest(int32_t x, int32_t y, GraphicsElement* hint) override;
+
         void ElementZIndexUpdated();
 
     protected:
