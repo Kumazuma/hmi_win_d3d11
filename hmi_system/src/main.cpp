@@ -7,6 +7,57 @@
 #include <wrl/client.h>
 
 class ColorButton;
+
+#if !defined(interface)
+#define interface struct
+#endif
+
+interface IHmiApplication;
+interface IHmiRenderer;
+interface IHmiRenderManager;
+interface IHmiSession;
+interface IHmiApplicationView;
+interface IHmiSystem: IUnknown
+{
+    virtual hmi_graphics::System* GetGraphicsSystem() = 0;
+
+    virtual bool BindElement(hmi_graphics::GraphicsElement* element, const UUID* appUuid) = 0;
+};
+
+interface IHmiModule: IUnknown
+{
+    virtual HRESULT OnLoaded(IHmiSystem*) = 0;
+
+    virtual HRESULT OnShutdown() = 0;
+
+    virtual HRESULT OnSpin() = 0;
+
+    virtual HRESULT GetApplication(IHmiApplication** application) = 0;
+
+    virtual HRESULT GetRenderer(IHmiRenderer** renderer) = 0;
+};
+
+interface IHmiApplication: IUnknown
+{
+    virtual HRESULT OnHit(int32_t x, int32_t y) = 0;
+    virtual HRESULT GetUuid(UUID* guid) = 0;
+};
+
+interface IHmiRenderer: IUnknown
+{
+    virtual HRESULT GetUuid(UUID* guid) = 0;
+};
+
+class ApplicationLoader
+{
+public:
+    ApplicationLoader();
+
+    ~ApplicationLoader();
+private:
+
+};
+
 class HmiSystemWindow
 {
 public:
