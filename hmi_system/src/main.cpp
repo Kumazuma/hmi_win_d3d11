@@ -1,52 +1,297 @@
 #include <atomic>
 #include <mutex>
 #include <string>
+#include <array>
 #include <Windows.h>
+#include <strsafe.h>
 #include <graphics/graphics_system.h>
 #include <graphics/graphics_element.h>
 #include <wrl/client.h>
 
 class ColorButton;
 
-#if !defined(interface)
-#define interface struct
-#endif
-
-interface IHmiApplication;
-interface IHmiRenderer;
-interface IHmiRenderManager;
-interface IHmiSession;
-interface IHmiApplicationView;
-interface IHmiSystem: IUnknown
+__interface IHmiApplication;
+__interface IHmiRenderer;
+__interface IHmiRenderManager;
+__interface IHmiSession;
+__interface IHmiApplicationView;
+__interface IHmiSystem: IUnknown
 {
-    virtual hmi_graphics::System* GetGraphicsSystem() = 0;
+    hmi_graphics::System* GetGraphicsSystem();
 
-    virtual bool BindElement(hmi_graphics::GraphicsElement* element, const UUID* appUuid) = 0;
+    bool BindElement(hmi_graphics::GraphicsElement* element, const UUID* appUuid);
 };
 
-interface IHmiModule: IUnknown
+__interface IHmiModule: IUnknown
 {
-    virtual HRESULT OnLoaded(IHmiSystem*) = 0;
+    STDMETHOD(OnLoaded)(IHmiSystem*);
 
-    virtual HRESULT OnShutdown() = 0;
+    STDMETHOD(OnShutdown)();
 
-    virtual HRESULT OnSpin() = 0;
+    STDMETHOD(OnSpin)();
 
-    virtual HRESULT GetApplication(IHmiApplication** application) = 0;
+    STDMETHOD(GetApplication)(IHmiApplication** application);
 
-    virtual HRESULT GetRenderer(IHmiRenderer** renderer) = 0;
+    STDMETHOD(GetRenderer)(IHmiRenderer** renderer);
 };
 
-interface IHmiApplication: IUnknown
+__interface IHmiApplication: IUnknown
 {
-    virtual HRESULT OnHit(int32_t x, int32_t y) = 0;
-    virtual HRESULT GetUuid(UUID* guid) = 0;
+    HRESULT OnHit(int32_t x, int32_t y);
+
+    HRESULT GetUuid(UUID* guid);
 };
 
-interface IHmiRenderer: IUnknown
+__interface IHmiRenderer: IUnknown
 {
-    virtual HRESULT GetUuid(UUID* guid) = 0;
+    HRESULT GetUuid(UUID* guid);
 };
+
+__interface IHmiRenderManager: IUnknown
+{
+
+};
+
+class BazelLabel : public hmi_graphics::GraphicsElement
+{
+public:
+    explicit BazelLabel(const D2D1_COLOR_F& color, const std::wstring& title);
+
+    auto Initialize(Pimpl* pimpl, hmi_graphics::System* parent) -> bool override;
+
+    auto Render(hmi_graphics::System* parent) -> void override;
+
+    auto SetText(const std::wstring& label) -> void;
+
+private:
+    Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> m_brush;
+    Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> m_blackBrush;
+    Microsoft::WRL::ComPtr<IDWriteTextFormat> m_textFormat;
+    Microsoft::WRL::ComPtr<IDWriteTextLayout> m_textLayout;
+    D2D1_COLOR_F m_color;
+    std::wstring m_label;
+};
+
+BazelLabel::BazelLabel(const D2D1_COLOR_F& color, const std::wstring& title)
+{
+    m_color = color;
+    m_label = title;
+}
+
+auto BazelLabel::Initialize(Pimpl* pimpl, hmi_graphics::System* parent) -> bool
+{
+    hmi_graphics::GraphicsElement::Initialize(pimpl, parent);
+    parent->GetCachedColorBrush(m_color, &m_brush);
+    parent->GetCachedColorBrush(D2D1::ColorF(D2D1::ColorF::Black), &m_blackBrush);
+    Microsoft::WRL::ComPtr<IDWriteFactory> dwriteFactory;
+    parent->GetDirectWriteFactory(&dwriteFactory);
+    dwriteFactory->CreateTextFormat(L"arial", nullptr, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL,
+        DWRITE_FONT_STRETCH_NORMAL, 11.f, L"", &m_textFormat);
+    m_textFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+    m_textFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+    auto size = GetSize();
+    dwriteFactory->CreateTextLayout(m_label.c_str(), m_label.size(), m_textFormat.Get(), size.width, size.height,
+        &m_textLayout);
+
+    return true;
+}
+
+auto BazelLabel::SetText(const std::wstring& label) -> void
+{
+    m_label = label;
+    Microsoft::WRL::ComPtr<IDWriteFactory> dwriteFactory;
+    auto size = GetSize();
+    dwriteFactory->CreateTextLayout(m_label.c_str(), m_label.size(), m_textFormat.Get(), size.width,
+        size.height, &m_textLayout);
+
+    GraphicsElement::NotifyUpdated();
+}
+
+auto BazelLabel::Render(hmi_graphics::System* parent) -> void
+{
+    Microsoft::WRL::ComPtr<ID2D1DeviceContext> context;
+    parent->GetDirect2dDeviceContext(&context);
+    context->SetTarget(GetTarget());
+    context->BeginDraw();
+    context->Clear(m_color);
+    context->DrawTextLayout(D2D1::Point2(0.f, 0.f), m_textLayout.Get(), m_blackBrush.Get());
+    context->EndDraw();
+}
+
+class PlanPositionIndicator : public hmi_graphics::GraphicsElement
+{
+public:
+    explicit PlanPositionIndicator(float angleHeadingRad);
+
+    auto Initialize(Pimpl* pimpl, hmi_graphics::System* parent) -> bool override;
+
+    auto Render(hmi_graphics::System* parent) -> void override;
+
+    auto SetAngleHeadingRad(float radian) -> void;
+
+private:
+    float m_angleHeadingRad;
+    Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> m_brush;
+    Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> m_blackBrush;
+    Microsoft::WRL::ComPtr<IDWriteTextFormat> m_textFormat;
+};
+
+PlanPositionIndicator::PlanPositionIndicator(float angleHeadingRad)
+    : m_angleHeadingRad{ angleHeadingRad }
+{
+    
+}
+
+auto PlanPositionIndicator::Initialize(Pimpl* pimpl, hmi_graphics::System* parent) -> bool
+{
+    if (!GraphicsElement::Initialize(pimpl, parent))
+    {
+        return false;
+    }
+
+    hmi_graphics::GraphicsElement::Initialize(pimpl, parent);
+    parent->GetCachedColorBrush(D2D1::ColorF{D2D1::ColorF::Red}, &m_brush);
+    parent->GetCachedColorBrush(D2D1::ColorF(D2D1::ColorF::Black), &m_blackBrush);
+    Microsoft::WRL::ComPtr<IDWriteFactory> dwriteFactory;
+    parent->GetDirectWriteFactory(&dwriteFactory);
+    dwriteFactory->CreateTextFormat(L"arial", nullptr, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL,
+        DWRITE_FONT_STRETCH_NORMAL, 11.f, L"", &m_textFormat);
+    m_textFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+    m_textFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+
+    Microsoft::WRL::ComPtr<ID2D1DeviceContext> context;
+    parent->GetDirect2dDeviceContext(&context);
+
+    auto size = GetSize();
+    return true;
+}
+
+auto PlanPositionIndicator::SetAngleHeadingRad(float radian) -> void
+{
+    m_angleHeadingRad = radian;
+    NotifyUpdated();
+}
+
+auto PlanPositionIndicator::Render(hmi_graphics::System* parent) -> void
+{
+    Microsoft::WRL::ComPtr<ID2D1DeviceContext> context;
+    parent->GetDirect2dDeviceContext(&context);
+    context->SetTarget(GetTarget());
+    context->BeginDraw();
+    context->Clear(D2D1::ColorF{D2D1::ColorF::White, 0.f});
+    
+    auto size = GetSize();
+
+    context->DrawEllipse(D2D1::Ellipse(D2D1::Point2F(size.width / 2, size.height / 2), size.width / 2 - 2, size.height / 2 - 2),
+        m_blackBrush.Get(), 2.f);
+
+    context->SetTransform(D2D1::Matrix3x2F::Scale(D2D1::SizeF(1.F, -1.f)) * D2D1::Matrix3x2F::Rotation(m_angleHeadingRad) * D2D1::Matrix3x2F::Translation(size.width / 2, size.height / 2));
+    context->FillRectangle(D2D1::RectF(-20.f, 30.f, 20.f, -30.f), m_brush.Get());
+    
+    context->EndDraw();
+    context->SetTransform(D2D1::IdentityMatrix());
+}
+
+class ExampleRenderManager : public IHmiRenderManager
+{
+public:
+    ExampleRenderManager() = default;
+
+    ~ExampleRenderManager();
+
+    auto QueryInterface(const GUID& riid, void** ppvObject) -> HRESULT override
+    {
+        return E_NOTIMPL;
+    }
+
+    auto AddRef() -> ULONG override
+    {
+        int refCnt = m_refCnt.fetch_add(1);
+        if (refCnt <= 0)
+        {
+            throw std::runtime_error("");
+        }
+
+        return refCnt + 1;
+    }
+
+    auto Release() -> ULONG override
+    {
+        int refCnt = m_refCnt.fetch_sub(1);
+        if (refCnt == 1)
+        {
+            delete this;
+        }
+
+        return refCnt - 1;
+    }
+
+    auto Initialize(hmi_graphics::System* system) -> HRESULT;
+
+    auto SpinOnce() -> HRESULT;
+
+private:
+    std::atomic_int m_refCnt = 1;
+    PlanPositionIndicator* m_ppi = nullptr;
+    std::array<BazelLabel*, 20> m_bazelButtons = {};
+};
+
+ExampleRenderManager::~ExampleRenderManager()
+{
+    delete m_ppi;
+    for (auto it : m_bazelButtons)
+    {
+        delete it;
+    }
+}
+
+auto ExampleRenderManager::Initialize(hmi_graphics::System* system) -> HRESULT
+{
+    m_ppi = system->AddElement<PlanPositionIndicator>(100, 100, 30.f);
+    for (auto& it : m_bazelButtons)
+    {
+        wchar_t buf[16]{};
+        const int index = &it - m_bazelButtons.data();
+        StringCbPrintfW(buf, sizeof(buf) - 1, L"F%02d", index + 1);
+        int width = 90;
+        int height = 70;
+        if (index > 11)
+        {
+            height = 35;
+        }
+
+        it = system->AddElement<BazelLabel>(width, height, D2D1::ColorF(D2D1::ColorF::Green, 0.5f), buf);
+    }
+
+    m_ppi->SetPosition(110, 80);
+    m_bazelButtons[0]->SetPosition(5, 70 + 75 * 0);
+    m_bazelButtons[1]->SetPosition(5, 70 + 75 * 1);
+    m_bazelButtons[2]->SetPosition(5, 70 + 75 * 2);
+    m_bazelButtons[3]->SetPosition(5, 70 + 75 * 3);
+    m_bazelButtons[4]->SetPosition(5, 70 + 75 * 4);
+    m_bazelButtons[5]->SetPosition(5, 70 + 75 * 5);
+    m_bazelButtons[6]->SetPosition(800 - 90 - 5, 70 + 75 * 0);
+    m_bazelButtons[7]->SetPosition(800 - 90 - 5, 70 + 75 * 1);
+    m_bazelButtons[8]->SetPosition(800 - 90 - 5, 70 + 75 * 2);
+    m_bazelButtons[9]->SetPosition(800 - 90 - 5, 70 + 75 * 3);
+    m_bazelButtons[10]->SetPosition(800 - 90 - 5, 70 + 75 * 4);
+    m_bazelButtons[11]->SetPosition(800 - 90 - 5, 70 + 75 * 5);
+    m_bazelButtons[12]->SetPosition(5 + 100 * 0, 600 - 40);
+    m_bazelButtons[13]->SetPosition(5 + 100 * 1, 600 - 40);
+    m_bazelButtons[14]->SetPosition(5 + 100 * 2, 600 - 40);
+    m_bazelButtons[15]->SetPosition(5 + 100 * 3, 600 - 40);
+    m_bazelButtons[16]->SetPosition(5 + 100 * 4, 600 - 40);
+    m_bazelButtons[17]->SetPosition(5 + 100 * 5, 600 - 40);
+    m_bazelButtons[18]->SetPosition(5 + 100 * 6, 600 - 40);
+    m_bazelButtons[19]->SetPosition(5 + 100 * 7, 600 - 40);
+
+    return S_OK;
+}
+
+auto ExampleRenderManager::SpinOnce() -> HRESULT
+{
+    return S_OK;
+}
 
 class ApplicationLoader
 {
@@ -67,12 +312,12 @@ public:
 
     void SpinOnce();
 
+    hmi_graphics::System* GetGraphics() { return m_graphics; }
+
 private:
     static LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
     HWND m_hWnd;
     hmi_graphics::System* m_graphics;
-    ColorButton* m_redButton;
-    ColorButton* m_greenButton;
 };
 
 class ColorButton: public hmi_graphics::GraphicsElement
@@ -103,11 +348,13 @@ bool ColorButton::Initialize(Pimpl* pimpl, hmi_graphics::System* parent)
     parent->GetCachedColorBrush(D2D1::ColorF(D2D1::ColorF::Black), &m_blackBrush);
     Microsoft::WRL::ComPtr<IDWriteFactory> dwriteFactory;
     parent->GetDirectWriteFactory(&dwriteFactory);
-    dwriteFactory->CreateTextFormat(L"arial", nullptr, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 11.f, L"", &m_textFormat);
+    dwriteFactory->CreateTextFormat(L"arial", nullptr, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL,
+        DWRITE_FONT_STRETCH_NORMAL, 11.f, L"", &m_textFormat);
     m_textFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
     m_textFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
     auto size = GetSize();
-    dwriteFactory->CreateTextLayout(m_label.c_str(), m_label.size(), m_textFormat.Get(), std::get<0>(size), std::get<1>(size), &m_textLayout);
+    dwriteFactory->CreateTextLayout(m_label.c_str(), m_label.size(), m_textFormat.Get(), size.width,
+        size.height, &m_textLayout);
     return true;
 }
 
@@ -126,6 +373,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 {
     HmiSystemWindow window(L"Hello World", 800, 600);
 
+    ExampleRenderManager* manager = new ExampleRenderManager{};
+    manager->Initialize(window.GetGraphics());
+    
     MSG message{};
     while(message.message != WM_QUIT)
     {
@@ -134,13 +384,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             TranslateMessage(&message);
             DispatchMessage(&message);
         }
-
+           
+        manager->SpinOnce();
         window.SpinOnce();
     }
 
+    manager->Release();
+
     return 0;
 }
-
 
 static std::atomic_bool init_flag;
 static std::mutex init_mutex;
@@ -148,8 +400,6 @@ static std::mutex init_mutex;
 HmiSystemWindow::HmiSystemWindow(const std::wstring& title, int width, int height)
     : m_hWnd(nullptr)
     , m_graphics()
-    , m_greenButton()
-    ,m_redButton()
 {
     HINSTANCE hInstance = GetModuleHandleW(nullptr);
     if(!init_flag.load())
@@ -177,14 +427,13 @@ HmiSystemWindow::HmiSystemWindow(const std::wstring& title, int width, int heigh
     AdjustWindowRectEx(&rc, WINDOW_STYLE, false, false);
     rc.right -= rc.left;
     rc.bottom -= rc.top;
-    m_hWnd = CreateWindowExW(0, L"KUMA_HMI_WINDOW", title.c_str(), WINDOW_STYLE, CW_USEDEFAULT, CW_USEDEFAULT, rc.right, rc.bottom, nullptr, nullptr, hInstance, this);
+    m_hWnd = CreateWindowExW(0, L"KUMA_HMI_WINDOW", title.c_str(), WINDOW_STYLE, CW_USEDEFAULT, CW_USEDEFAULT,
+        rc.right, rc.bottom, nullptr, nullptr, hInstance, this);
     ShowWindow(m_hWnd, SW_SHOW);
 }
 
 HmiSystemWindow::~HmiSystemWindow()
 {
-    delete m_redButton;
-    delete m_greenButton;
     delete m_graphics;
 }
 
@@ -220,10 +469,6 @@ LRESULT HmiSystemWindow::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
         auto instance = (HmiSystemWindow*)s->lpCreateParams;
         SetWindowLongPtrW(hWnd, GWLP_USERDATA, (LONG_PTR)instance);
         instance->m_graphics = graphics;
-        instance->m_redButton = graphics->AddElement<ColorButton>(100, 100, D2D1::ColorF(D2D1::ColorF::Red, 0.5f), L"Red Button");
-        instance->m_greenButton = graphics->AddElement<ColorButton>(100, 100, D2D1::ColorF(D2D1::ColorF::Green, 1.f), L"Green Button");
-        instance->m_redButton->SetPosition(50, 50);
-        instance->m_redButton->SetZIndex(1);
         return 0;
     }
 
