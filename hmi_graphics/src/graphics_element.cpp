@@ -46,7 +46,7 @@ namespace hmi_graphics
         pimpl_->height_ = height;
     }
 
-    std::tuple<int16_t, int16_t> GraphicsElement::GetSize() const
+    Size GraphicsElement::GetSize() const
     {
         return {pimpl_->width_, pimpl_->height_};
     }
@@ -57,7 +57,7 @@ namespace hmi_graphics
         pimpl_->y_ = y;
     }
 
-    std::tuple<int16_t, int16_t> GraphicsElement::GetPosition() const
+    Point GraphicsElement::GetPosition() const
     {
         return {pimpl_->x_, pimpl_->y_};
     }

@@ -150,9 +150,9 @@ namespace hmi_graphics
             auto& element = std::get<0>(tuple);
             auto size = element->GetSize();
             auto pos = element->GetPosition();
-            auto dest = D2D1::RectF(std::get<0>(pos), std::get<1>(pos));
-            dest.right = dest.left + (float)std::get<0>(size);
-            dest.bottom = dest.top + (float)std::get<1>(size);
+            auto dest = D2D1::RectF(pos.x, pos.y);
+            dest.right = dest.left + (float)size.width;
+            dest.bottom = dest.top + (float)size.height;
             d2dContextForRendering_->DrawBitmap(bitmap.Get(), dest);
         }
 
@@ -203,18 +203,14 @@ namespace hmi_graphics
 
             auto& tuple = *iter;
             auto* element = std::get<0>(tuple);
-            int16_t posX;
-            int16_t posY;
-            int16_t width;
-            int16_t height;
-            std::tie(posX, posY) = element->GetPosition();
-            if(posX > x || posY > y)
+            auto pos = element->GetPosition();
+            if(pos.x > x || pos.y > y)
                 continue;
 
-            std::tie(width, height) = element->GetSize();
-            posX += width;
-            posY += height;
-            if(posX < x || posY < y)
+            auto size = element->GetSize();
+            pos.x += size.width;
+            pos.y += size.height;
+            if(pos.x < x || pos.y < y)
                 continue;
 
             result = element;

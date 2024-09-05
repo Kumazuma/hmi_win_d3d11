@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <tuple>
 #include <d2d1_2.h>
+#include "types.h"
 
 #if defined(_WIN32) && defined(HMI_GRAPHICS_DLL)
 #if !defined(HMI_GRAPHICS_EXPORT)
@@ -35,11 +36,11 @@ namespace hmi_graphics
 
         void SetSize(int16_t width, int16_t height);
 
-        std::tuple<int16_t, int16_t> GetSize() const;
+        Size GetSize() const;
 
         void SetPosition(int16_t x, int16_t y);
 
-        std::tuple<int16_t, int16_t> GetPosition() const;
+        Point GetPosition() const;
 
         bool GetTarget(ID2D1Bitmap1** target);
 
