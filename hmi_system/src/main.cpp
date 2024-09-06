@@ -1,3 +1,4 @@
+#define NOMINMAX
 #include <atomic>
 #include <mutex>
 #include <string>
@@ -15,6 +16,7 @@ __interface IHmiRenderer;
 __interface IHmiRenderManager;
 __interface IHmiSession;
 __interface IHmiApplicationView;
+__interface IHmiApplicationSession;
 __interface IHmiSystem: IUnknown
 {
     hmi_graphics::System* GetGraphicsSystem();
@@ -31,15 +33,15 @@ __interface IHmiModule: IUnknown
     STDMETHOD(OnSpin)();
 
     STDMETHOD(GetApplication)(IHmiApplication** application);
-
-    STDMETHOD(GetRenderer)(IHmiRenderer** renderer);
 };
 
 __interface IHmiApplication: IUnknown
 {
-    HRESULT OnHit(int32_t x, int32_t y);
+    STDMETHOD(OnHit)(int32_t x, int32_t y);
 
-    HRESULT GetUuid(UUID* guid);
+    STDMETHOD(GetUuid)(UUID* guid);
+
+    STDMETHOD(CreeteSession)(IHmiApplicationView* view, IHmiRenderManager* renderer, IHmiApplicationSession** session);
 };
 
 __interface IHmiRenderer: IUnknown
@@ -129,11 +131,14 @@ public:
 
     auto SetAngleHeadingRad(float radian) -> void;
 
+    auto GetAngleHeadingRad() -> float;
+
 private:
     float m_angleHeadingRad;
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> m_brush;
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> m_blackBrush;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> m_textFormat;
+    D2D1::Matrix3x2F m_transform;
 };
 
 PlanPositionIndicator::PlanPositionIndicator(float angleHeadingRad)
@@ -163,33 +168,43 @@ auto PlanPositionIndicator::Initialize(Pimpl* pimpl, hmi_graphics::System* paren
     parent->GetDirect2dDeviceContext(&context);
 
     auto size = GetSize();
+    auto transform = D2D1::Matrix3x2F::Scale(D2D1::SizeF(1.F, -1.f));
+    transform = transform * D2D1::Matrix3x2F::Rotation(m_angleHeadingRad);
+    transform = transform * D2D1::Matrix3x2F::Translation(size.width / 2, size.height / 2);
+    m_transform = transform;
     return true;
 }
 
 auto PlanPositionIndicator::SetAngleHeadingRad(float radian) -> void
 {
     m_angleHeadingRad = radian;
+    auto size = GetSize();
+    auto transform = D2D1::Matrix3x2F::Scale(D2D1::SizeF(1.F, -1.f));
+    transform = transform * D2D1::Matrix3x2F::Rotation(m_angleHeadingRad);
+    transform = transform * D2D1::Matrix3x2F::Translation(size.width / 2, size.height / 2);
+    m_transform = transform;
     NotifyUpdated();
 }
 
 auto PlanPositionIndicator::Render(hmi_graphics::System* parent) -> void
 {
+    auto size = GetSize();
+    const float radius = std::min(size.width / 2, size.height / 2) - 2.f;
     Microsoft::WRL::ComPtr<ID2D1DeviceContext> context;
     parent->GetDirect2dDeviceContext(&context);
     context->SetTarget(GetTarget());
     context->BeginDraw();
     context->Clear(D2D1::ColorF{D2D1::ColorF::White, 0.f});
-    
-    auto size = GetSize();
-
-    context->DrawEllipse(D2D1::Ellipse(D2D1::Point2F(size.width / 2, size.height / 2), size.width / 2 - 2, size.height / 2 - 2),
-        m_blackBrush.Get(), 2.f);
-
-    context->SetTransform(D2D1::Matrix3x2F::Scale(D2D1::SizeF(1.F, -1.f)) * D2D1::Matrix3x2F::Rotation(m_angleHeadingRad) * D2D1::Matrix3x2F::Translation(size.width / 2, size.height / 2));
+    context->SetTransform(m_transform);
+    context->DrawEllipse(D2D1::Ellipse(D2D1::Point2F(0.f, 0.f), radius, radius), m_blackBrush.Get(), 2.f);
     context->FillRectangle(D2D1::RectF(-20.f, 30.f, 20.f, -30.f), m_brush.Get());
-    
     context->EndDraw();
     context->SetTransform(D2D1::IdentityMatrix());
+}
+
+auto PlanPositionIndicator::GetAngleHeadingRad() -> float
+{
+    return m_angleHeadingRad;
 }
 
 class ExampleRenderManager : public IHmiRenderManager
@@ -290,6 +305,8 @@ auto ExampleRenderManager::Initialize(hmi_graphics::System* system) -> HRESULT
 
 auto ExampleRenderManager::SpinOnce() -> HRESULT
 {
+    auto s = m_ppi->GetAngleHeadingRad();
+    m_ppi->SetAngleHeadingRad(s + 0.2f);
     return S_OK;
 }
 
@@ -369,8 +386,11 @@ void ColorButton::Render(hmi_graphics::System* parent)
     context->EndDraw();
 }
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
-{
+int WINAPI wWinMain(
+    _In_ HINSTANCE hInstance,
+    _In_opt_ HINSTANCE hPrevInstance,
+    _In_ LPWSTR lpCmdLine,
+    _In_ int nShowCmd) {
     HmiSystemWindow window(L"Hello World", 800, 600);
 
     ExampleRenderManager* manager = new ExampleRenderManager{};
@@ -379,10 +399,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     MSG message{};
     while(message.message != WM_QUIT)
     {
-        if(PeekMessage(&message, nullptr, 0, 0, PM_REMOVE))
+        if(PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE))
         {
             TranslateMessage(&message);
-            DispatchMessage(&message);
+            DispatchMessageW(&message);
         }
            
         manager->SpinOnce();
@@ -394,13 +414,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     return 0;
 }
 
-static std::atomic_bool init_flag;
-static std::mutex init_mutex;
-
 HmiSystemWindow::HmiSystemWindow(const std::wstring& title, int width, int height)
     : m_hWnd(nullptr)
     , m_graphics()
 {
+    static std::atomic_bool init_flag;
+    static std::mutex init_mutex;
     HINSTANCE hInstance = GetModuleHandleW(nullptr);
     if(!init_flag.load())
     {
@@ -410,8 +429,8 @@ HmiSystemWindow::HmiSystemWindow(const std::wstring& title, int width, int heigh
             WNDCLASSW wndClass{};
             wndClass.style = CS_OWNDC;
             wndClass.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-            wndClass.hIcon = LoadIcon(nullptr, IDI_APPLICATION);
-            wndClass.hCursor = LoadCursor(nullptr, IDC_ARROW);
+            wndClass.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
+            wndClass.hCursor = LoadCursorW(nullptr, IDC_ARROW);
             wndClass.hInstance = hInstance;
             wndClass.cbClsExtra = 0;
             wndClass.cbWndExtra = sizeof(intptr_t);
@@ -463,7 +482,9 @@ LRESULT HmiSystemWindow::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
         GetClientRect(hWnd, &rc);
         auto graphics = hmi_graphics::System::CreateInstance(hWnd, rc.right - rc.left, rc.bottom - rc.top);
         if(graphics == nullptr)
+        {
             return DefWindowProcW(hWnd, uMsg, wParam, lParam);
+        }
 
         auto s = (CREATESTRUCT*)lParam;
         auto instance = (HmiSystemWindow*)s->lpCreateParams;
